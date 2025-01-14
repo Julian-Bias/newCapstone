@@ -10,26 +10,15 @@ const GamePage = () => {
   const [error, setError] = useState(null);
 
   // Function to handle new review submission
-  const handleNewReview = async (reviewData) => {
-    try {
-      const response = await fetch("http://localhost:3000/api/reviews", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({ ...reviewData, game_id: id }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to submit review");
+  const handleNewReview = (newReview) => {
+    setReviews((prevReviews) => {
+      // Prevent duplicate reviews by checking if the review ID already exists
+      if (prevReviews.some((review) => review.id === newReview.id)) {
+        console.warn("Duplicate review detected. Skipping addition.");
+        return prevReviews;
       }
-
-      const newReview = await response.json();
-      setReviews((prevReviews) => [...prevReviews, newReview]);
-    } catch (err) {
-      console.error("Error submitting review:", err.message);
-    }
+      return [...prevReviews, newReview];
+    });
   };
 
   // Fetch game details and reviews
@@ -38,6 +27,7 @@ const GamePage = () => {
       try {
         const response = await fetch(`http://localhost:3000/api/games/${id}`);
         if (!response.ok) throw new Error("Failed to fetch game details");
+
         const data = await response.json();
         setGame(data.game);
         setReviews(data.reviews);

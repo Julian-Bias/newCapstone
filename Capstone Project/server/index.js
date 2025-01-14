@@ -288,7 +288,58 @@ app.delete("/api/categories/:id", authenticateToken, async (req, res) => {
   }
 });
 
+// Fetch all users **Admin Only
+app.get("/api/users", authenticateToken, async (req, res) => {
+  try {
+    // Ensure only admin users can access this route
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    // Query to fetch all users
+    const SQL = `
+      SELECT id, username, email, role, created_at
+      FROM users
+      ORDER BY created_at DESC
+    `;
+    const result = await db.client.query(SQL);
+
+    // Return the list of users
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching users:", err);
+    res.status(500).json({ message: "Error fetching users" });
+  }
+});
+
 // --- Protected Routes ---
+
+// Get a users comments
+app.get("/api/users/:id/comments", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const SQL = `
+      SELECT c.*, g.title AS game_title
+      FROM comments c
+      JOIN reviews r ON c.review_id = r.id
+      JOIN games g ON r.game_id = g.id
+      WHERE c.user_id = $1
+    `;
+    const result = await db.client.query(SQL, [id]);
+
+    if (result.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "No comments found for this user" });
+    }
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching user comments:", err);
+    res.status(500).json({ message: "Error fetching comments" });
+  }
+});
 
 //  Create a review
 app.post("/api/reviews", authenticateToken, async (req, res) => {
