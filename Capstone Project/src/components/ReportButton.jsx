@@ -9,7 +9,7 @@ const ReportButton = ({ reviewId, commentId }) => {
       const token = localStorage.getItem("token");
       if (!token) throw new Error("You must be logged in to report content");
 
-      const response = await fetch("/api/reports", {
+      const response = await fetch("http://localhost:3000/api/reports", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

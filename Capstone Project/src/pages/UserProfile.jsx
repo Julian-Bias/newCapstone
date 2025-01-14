@@ -14,7 +14,7 @@ const UserProfile = () => {
         const token = localStorage.getItem("token");
         if (!token) throw new Error("Not authenticated");
 
-        const response = await fetch("/api/users/me", {
+        const response = await fetch("http://localhost:3000/api/users/me", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -25,22 +25,28 @@ const UserProfile = () => {
         setUser(userData);
 
         // Fetch user reviews
-        const reviewsResponse = await fetch(`/api/users/${userData.id}/reviews`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const reviewsResponse = await fetch(
+          `http://localhost:3000/api/users/${userData.id}/reviews`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
         if (reviewsResponse.ok) {
           const reviewsData = await reviewsResponse.json();
           setReviews(reviewsData);
         }
 
         // Fetch user comments
-        const commentsResponse = await fetch(`/api/users/${userData.id}/comments`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const commentsResponse = await fetch(
+          `http://localhost:3000/api/users/${userData.id}/comments`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
         if (commentsResponse.ok) {
           const commentsData = await commentsResponse.json();
           setComments(commentsData);

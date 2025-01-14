@@ -4,9 +4,11 @@ const path = require("path");
 const db = require("./db");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const cors = require("cors");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+app.use(cors());
 
 // Middleware
 app.use(express.json());
@@ -24,6 +26,17 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
+
+// --- Serve React App in Production ---
+if (process.env.NODE_ENV === "production") {
+  // Serve static files from the React app's build folder
+  app.use(express.static(path.join(__dirname, "../dist")));
+
+  // Catch-all route to serve React's index.html for non-API requests
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(__dirname, "../dist/index.html"));
+  });
+}
 
 // --- Public Routes ---
 
@@ -69,52 +82,73 @@ app.get("/api/games/:id", async (req, res) => {
 });
 
 // Get games with search and filter
-app.get("/api/games", async (req, res) => {
-  const { search, category } = req.query;
-  try {
-    let SQL = `
-      SELECT g.*, c.name AS category_name, 
-             (SELECT AVG(rating) FROM reviews WHERE game_id = g.id) AS average_rating
-      FROM games g
-      LEFT JOIN categories c ON g.category_id = c.id
-    `;
-    const params = [];
+// app.get("/api/games", async (req, res) => {
+//   const { search, category } = req.query;
+//   try {
+//     let SQL = `
+//       SELECT g.*, c.name AS category_name,
+//              (SELECT AVG(rating) FROM reviews WHERE game_id = g.id) AS average_rating
+//       FROM games g
+//       LEFT JOIN categories c ON g.category_id = c.id
+//     `;
+//     const params = [];
 
-    if (search || category) {
-      SQL += " WHERE";
-      if (search) {
-        SQL += " LOWER(g.title) LIKE $1";
-        params.push(`%${search.toLowerCase()}%`);
-      }
-      if (category) {
-        if (params.length > 0) SQL += " AND";
-        SQL += " c.id = $2";
-        params.push(category);
-      }
-    }
+//     if (search || category) {
+//       SQL += " WHERE";
+//       if (search) {
+//         SQL += " LOWER(g.title) LIKE $1";
+//         params.push(`%${search.toLowerCase()}%`);
+//       }
+//       if (category) {
+//         if (params.length > 0) SQL += " AND";
+//         SQL += " c.id = $2";
+//         params.push(category);
+//       }
+//     }
 
-    const games = await db.client.query(SQL, params);
-    res.json(games.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error fetching games");
-  }
-});
+//     const games = await db.client.query(SQL, params);
+//     res.json(games.rows);
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).send("Error fetching games");
+//   }
+// });
 
 //  Register a new user
 app.post("/api/register", async (req, res) => {
   const { username, email, password } = req.body;
+
+  if (!username || !email || !password) {
+    return res.status(400).json({ message: "All fields are required" });
+  }
+
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
+
     const user = await db.createUser({
       username,
       email,
       password_hash: hashedPassword,
     });
-    res.status(201).json(user);
+
+    res.status(201).json({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      created_at: user.created_at,
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error registering user");
+    console.error("Error in /api/register:", err);
+
+    // Handle duplicate key errors (e.g., unique constraints)
+    if (err.code === "23505") {
+      // PostgreSQL unique violation
+      return res
+        .status(400)
+        .json({ message: "Email or username already exists" });
+    }
+
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -150,27 +184,43 @@ app.put("/api/users/me", authenticateToken, async (req, res) => {
 //  Login
 app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ message: "Email and password are required" });
+  }
+
   try {
-    const user = await db.client.query(`SELECT * FROM users WHERE email = $1`, [
-      email,
-    ]);
-    if (
-      user.rows.length === 0 ||
-      !(await bcrypt.compare(password, user.rows[0].password_hash))
-    ) {
-      return res.status(401).send("Invalid credentials");
+    const userQuery = `SELECT * FROM users WHERE email = $1`;
+    const result = await db.client.query(userQuery, [email]);
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ message: "Invalid email or password" });
     }
+
+    const user = result.rows[0];
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
     const token = jwt.sign(
-      { id: user.rows[0].id, role: user.rows[0].role },
-      SECRET_KEY,
-      {
-        expiresIn: "1h",
-      }
+      { id: user.id, role: user.role },
+      process.env.SECRET_KEY,
+      { expiresIn: "1h" }
     );
-    res.json({ token });
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+      },
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error logging in");
+    console.error("Error in /api/login:", err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -351,17 +401,6 @@ app.delete("/api/comments/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// --- Serve React App in Production ---
-if (process.env.NODE_ENV === "production") {
-  // Serve static files from the React app's build folder
-  app.use(express.static(path.join(__dirname, "../client/dist")));
-
-  // Catch-all route to serve React's index.html for non-API requests
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "../client/dist/index.html"));
-  });
-}
-
 // --- Start the Server ---
 app.listen(PORT, async () => {
   try {
@@ -371,4 +410,3 @@ app.listen(PORT, async () => {
     console.error("Error connecting to the database:", err);
   }
 });
-

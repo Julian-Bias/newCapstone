@@ -11,7 +11,7 @@ const ReviewForm = ({ gameId, onReviewSubmit }) => {
       const token = localStorage.getItem("token");
       if (!token) throw new Error("You must be logged in to submit a review");
 
-      const response = await fetch("/api/reviews", {
+      const response = await fetch("http://localhost:3000/api/reviews", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
