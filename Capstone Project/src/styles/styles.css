@@ -1,0 +1,19 @@
+.games-list {
+    margin: 20px;
+    padding: 20px;
+    background-color: #f9f9f9;
+  }
+  
+  .games-list-container {
+    list-style-type: none;
+    padding: 0;
+  }
+  
+  .game-item {
+    margin: 10px 0;
+    padding: 15px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #fff;
+  }
+  
