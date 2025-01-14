@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
+import ReviewForm from "../components/ReviewForm";
 
-const GameDetails = () => {
+const GamePage = () => {
   const { id } = useParams();
   const [game, setGame] = useState(null);
   const [reviews, setReviews] = useState([]);
@@ -9,7 +10,7 @@ const GameDetails = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchGameDetails = async () => {
+    const fetchGamePage = async () => {
       try {
         const response = await fetch(`/api/games/${id}`);
         if (!response.ok) throw new Error("Failed to fetch game details");
@@ -23,7 +24,7 @@ const GameDetails = () => {
       }
     };
 
-    fetchGameDetails();
+    fetchGamePage();
   }, [id]);
 
   if (loading) return <div>Loading...</div>;
@@ -31,21 +32,32 @@ const GameDetails = () => {
 
   return (
     <div>
+      {/* Game details */}
       <h1>{game.title}</h1>
+      <img src={game.image_url} alt={game.title} />
       <p>{game.description}</p>
-      <p>Average Rating: {game.average_rating.toFixed(2)}</p>
+      <p>Category: {game.category_name}</p>
+      <p>Average Rating: {game.average_rating || "No ratings yet"}</p>
+
       <h2>Reviews</h2>
-      <ul>
-        {reviews.map((review) => (
-          <li key={review.id}>
-            <p>{review.review_text}</p>
+      {reviews.length > 0 ? (
+        reviews.map((review) => (
+          <div key={review.id} className="review-card">
+            <p>
+              <strong>{review.username}:</strong> {review.review_text}
+            </p>
             <p>Rating: {review.rating}</p>
-            <p>By: {review.username}</p>
-          </li>
-        ))}
-      </ul>
+          </div>
+        ))
+      ) : (
+        <p>No reviews yet. Be the first to write one!</p>
+      )}
+
+      {/* Review Form */}
+      <ReviewForm gameId={id} onReviewSubmit={handleNewReview} />
+      <ReportButton reviewId={review.id} />
     </div>
   );
 };
 
-export default GameDetails;
+export default GamePage;

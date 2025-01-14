@@ -17,6 +17,7 @@ const App = () => {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/profile" element={<UserProfile />} />
+        <Route path="/games/:id" element={<GamePage />} />
       </Routes>
     </Router>
   );

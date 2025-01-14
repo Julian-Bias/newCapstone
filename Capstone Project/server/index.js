@@ -1,5 +1,6 @@
 require("dotenv").config();
 const express = require("express");
+const path = require("path");
 const db = require("./db");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
@@ -7,6 +8,7 @@ const jwt = require("jsonwebtoken");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Middleware
 app.use(express.json());
 
 // Middleware to authenticate JWT tokens
@@ -16,7 +18,7 @@ const authenticateToken = (req, res, next) => {
 
   if (!token) return res.sendStatus(401);
 
-  jwt.verify(token, SECRET_KEY, (err, user) => {
+  jwt.verify(token, process.env.SECRET_KEY, (err, user) => {
     if (err) return res.sendStatus(403);
     req.user = user;
     next();
@@ -349,8 +351,24 @@ app.delete("/api/comments/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// Start the server
+// --- Serve React App in Production ---
+if (process.env.NODE_ENV === "production") {
+  // Serve static files from the React app's build folder
+  app.use(express.static(path.join(__dirname, "../client/dist")));
+
+  // Catch-all route to serve React's index.html for non-API requests
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+  });
+}
+
+// --- Start the Server ---
 app.listen(PORT, async () => {
-  await db.client.connect();
-  console.log(`Server is running on http://localhost:${PORT}`);
+  try {
+    await db.client.connect();
+    console.log(`Server is running on http://localhost:${PORT}`);
+  } catch (err) {
+    console.error("Error connecting to the database:", err);
+  }
 });
+
