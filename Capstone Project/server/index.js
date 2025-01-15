@@ -57,27 +57,29 @@ app.get("/api/games/:id", async (req, res) => {
   try {
     const game = await db.client.query(
       `
-      SELECT g.*, c.name as category_name, 
-             (SELECT AVG(rating) FROM reviews WHERE game_id = $1) as average_rating
+      SELECT g.*, c.name AS category_name,
+             (SELECT AVG(rating) FROM reviews WHERE game_id = $1) AS average_rating
       FROM games g
       LEFT JOIN categories c ON g.category_id = c.id
       WHERE g.id = $1
-    `,
+      `,
       [id]
     );
+
     const reviews = await db.client.query(
       `
-      SELECT r.*, u.username 
+      SELECT r.*, u.username, r.user_id
       FROM reviews r
       JOIN users u ON r.user_id = u.id
       WHERE r.game_id = $1
-    `,
+      `,
       [id]
     );
+
     res.json({ game: game.rows[0], reviews: reviews.rows });
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error fetching game details");
+    console.error("Error fetching game details:", err);
+    res.status(500).json({ error: "Failed to fetch game details" });
   }
 });
 
@@ -185,27 +187,20 @@ app.put("/api/users/me", authenticateToken, async (req, res) => {
 app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ message: "Email and password are required" });
-  }
-
   try {
-    const userQuery = `SELECT * FROM users WHERE email = $1`;
-    const result = await db.client.query(userQuery, [email]);
+    const user = await db.client.query(`SELECT * FROM users WHERE email = $1`, [
+      email,
+    ]);
 
-    if (result.rows.length === 0) {
-      return res.status(401).json({ message: "Invalid email or password" });
-    }
-
-    const user = result.rows[0];
-    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-
-    if (!isPasswordValid) {
-      return res.status(401).json({ message: "Invalid email or password" });
+    if (
+      user.rows.length === 0 ||
+      !(await bcrypt.compare(password, user.rows[0].password_hash))
+    ) {
+      return res.status(401).send("Invalid credentials");
     }
 
     const token = jwt.sign(
-      { id: user.id, role: user.role },
+      { id: user.rows[0].id, role: user.rows[0].role },
       process.env.SECRET_KEY,
       { expiresIn: "1h" }
     );
@@ -213,14 +208,14 @@ app.post("/api/login", async (req, res) => {
     res.json({
       token,
       user: {
-        id: user.id,
-        email: user.email,
-        username: user.username,
+        id: user.rows[0].id,
+        username: user.rows[0].username,
+        email: user.rows[0].email,
       },
     });
   } catch (err) {
-    console.error("Error in /api/login:", err);
-    res.status(500).json({ message: "Server error" });
+    console.error("Login Error:", err.message);
+    res.status(500).send("Error logging in");
   }
 });
 
@@ -315,28 +310,27 @@ app.get("/api/users", authenticateToken, async (req, res) => {
 // --- Protected Routes ---
 
 // Get a users comments
-app.get("/api/users/:id/comments", async (req, res) => {
+app.get("/api/users/:id/comments", authenticateToken, async (req, res) => {
   const { id } = req.params;
 
+  // Check if the logged-in user matches the requested user or is an admin
+  if (req.user.id !== id && req.user.role !== "admin") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
   try {
-    const SQL = `
-      SELECT c.*, g.title AS game_title
+    const comments = await db.client.query(
+      `
+      SELECT c.id, c.comment_text, c.review_id, c.user_id, r.review_text 
       FROM comments c
       JOIN reviews r ON c.review_id = r.id
-      JOIN games g ON r.game_id = g.id
       WHERE c.user_id = $1
-    `;
-    const result = await db.client.query(SQL, [id]);
-
-    if (result.rows.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No comments found for this user" });
-    }
-
-    res.json(result.rows);
+      `,
+      [id]
+    );
+    res.json(comments.rows);
   } catch (err) {
-    console.error("Error fetching user comments:", err);
+    console.error("Error fetching comments:", err);
     res.status(500).json({ message: "Error fetching comments" });
   }
 });
@@ -361,35 +355,43 @@ app.post("/api/reviews", authenticateToken, async (req, res) => {
 //  Edit a review
 app.put("/api/reviews/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const { rating, review_text } = req.body;
+  const { review_text, rating } = req.body;
+
   try {
     const result = await db.client.query(
       `
-      UPDATE reviews 
-      SET rating = $1, review_text = $2 
-      WHERE id = $3 AND user_id = $4 RETURNING *
-    `,
-      [rating, review_text, id, req.user.id]
+      UPDATE reviews
+      SET review_text = $1, rating = $2
+      WHERE id = $3 AND user_id = $4
+      RETURNING *;
+      `,
+      [review_text, rating, id, req.user.id]
     );
-    if (result.rows.length === 0)
-      return res.status(404).send("Review not found");
+
+    if (result.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "Review not found or unauthorized" });
+    }
+
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error editing review");
+    console.error("Error editing review:", err);
+    res.status(500).json({ message: "Error editing review" });
   }
 });
 
 // Fetch user reviews
 app.get("/api/users/:id/reviews", authenticateToken, async (req, res) => {
   const { id } = req.params;
+
   try {
-    if (id !== req.user.id && req.user.role !== "admin") {
+    if (req.user.id !== id && req.user.role !== "admin") {
       return res.status(403).send("Access denied");
     }
 
     const SQL = `
-      SELECT r.*, g.title AS game_title
+      SELECT r.id, r.review_text, r.rating, r.game_id, g.title AS game_title
       FROM reviews r
       JOIN games g ON r.game_id = g.id
       WHERE r.user_id = $1
@@ -397,41 +399,107 @@ app.get("/api/users/:id/reviews", authenticateToken, async (req, res) => {
     const reviews = await db.client.query(SQL, [id]);
     res.json(reviews.rows);
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error fetching user reviews");
+    console.error("Error fetching user reviews:", err.message);
+    res.status(500).send("Failed to fetch reviews");
   }
 });
+
+// Edit a review
+// app.put("/api/reviews/:id", authenticateToken, async (req, res) => {
+//   const { id } = req.params;
+//   const { review_text, rating } = req.body;
+
+//   try {
+//     const result = await db.client.query(
+//       `
+//       UPDATE reviews
+//       SET review_text = $1, rating = $2
+//       WHERE id = $3 AND user_id = $4
+//       RETURNING *;
+//       `,
+//       [review_text, rating, id, req.user.id]
+//     );
+
+//     if (result.rows.length === 0) {
+//       return res
+//         .status(404)
+//         .json({ message: "Review not found or unauthorized" });
+//     }
+
+//     res.json(result.rows[0]); // Return the updated review
+//   } catch (err) {
+//     console.error("Error editing review:", err);
+//     res.status(500).json({ message: "Error editing review" });
+//   }
+// });
 
 //  Delete a review
 app.delete("/api/reviews/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
+
   try {
     const result = await db.client.query(
-      `DELETE FROM reviews WHERE id = $1 AND user_id = $2 RETURNING *`,
+      `
+      DELETE FROM reviews
+      WHERE id = $1 AND user_id = $2
+      RETURNING *;
+      `,
       [id, req.user.id]
     );
-    if (result.rows.length === 0)
-      return res.status(404).send("Review not found");
+
+    if (result.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "Review not found or unauthorized" });
+    }
+
     res.status(204).send();
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error deleting review");
+    console.error("Error deleting review:", err);
+    res.status(500).json({ message: "Error deleting review" });
   }
 });
 
 //  Add a comment to a review
 app.post("/api/comments", authenticateToken, async (req, res) => {
   const { review_id, comment_text } = req.body;
+
   try {
-    const comment = await db.createComment({
-      review_id,
-      user_id: req.user.id,
-      comment_text,
-    });
-    res.status(201).json(comment);
+    const result = await db.client.query(
+      `
+      INSERT INTO comments (id, review_id, user_id, comment_text)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *
+      `,
+      [uuid.v4(), review_id, req.user.id, comment_text]
+    );
+
+    res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error adding comment");
+    console.error("Error adding comment:", err.message);
+    res.status(500).send("Failed to add comment");
+  }
+});
+
+// Get All comments on a review
+app.get("/api/reviews/:id/comments", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await db.client.query(
+      `
+      SELECT c.*, u.username
+      FROM comments c
+      JOIN users u ON c.user_id = u.id
+      WHERE c.review_id = $1
+      `,
+      [id]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching comments:", err.message);
+    res.status(500).send("Failed to fetch comments");
   }
 });
 

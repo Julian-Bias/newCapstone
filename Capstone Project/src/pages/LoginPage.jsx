@@ -17,42 +17,55 @@ const LoginPage = ({ onLogin }) => {
         },
         body: JSON.stringify({ email, password }),
       });
-
+  
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Login failed");
+        throw new Error("Invalid email or password");
       }
-
-      const data = await response.json();
-      localStorage.setItem("token", data.token); // Store token
-      onLogin(data.user); // Call the onLogin function with user data
-      navigate("/games"); // Redirect to games page
+  
+      const { token, user } = await response.json();
+  
+      // Save token and userId in localStorage
+      localStorage.setItem("token", token);
+      localStorage.setItem("userId", user.id); // Store userId
+      console.log("User ID stored in Local Storage:", user.id);
+  
+      // Call the onLogin function to update parent state
+      onLogin(user);
+  
+      // Redirect to profile page
+      navigate("/profile");
     } catch (err) {
       setError(err.message);
+      console.error("Login Error:", err.message);
     }
   };
+  
 
   return (
     <div>
-      <h1>Login</h1>
+      <h2>Login</h2>
+      {error && <p style={{ color: "red" }}>{error}</p>}
       <form onSubmit={handleLogin}>
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
+        <label>
+          Email:
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </label>
+        <br />
+        <label>
+          Password:
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </label>
+        <br />
         <button type="submit">Login</button>
       </form>
-      {error && <p style={{ color: "red" }}>{error}</p>}
     </div>
   );
 };

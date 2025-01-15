@@ -9,13 +9,10 @@ const GamesList = () => {
   useEffect(() => {
     const fetchGames = async () => {
       try {
-        const response = await fetch("/api/games");
-        if (!response.ok) {
-          throw new Error(
-            `Error: ${response.status} ${response.statusText}`
-          );
-        }
+        const response = await fetch("http://localhost:3000/api/games");
+        if (!response.ok) throw new Error("Failed to fetch games");
         const data = await response.json();
+        console.log("Fetched Games:", data); // Debugging
         setGames(data);
       } catch (err) {
         setError(err.message);
@@ -31,18 +28,18 @@ const GamesList = () => {
   if (error) return <div>Error: {error}</div>;
 
   return (
-    <div className="games-list">
+    <div>
       <h1>Game Reviews</h1>
-      <ul className="games-list-container">
+      <ul>
         {games.map((game) => (
-          <li key={game.id} className="game-item">
+          <li key={game.id}>
             <h2>
               <Link to={`/games/${game.id}`}>{game.title}</Link>
             </h2>
             <p>{game.description}</p>
             <p>
               Average Rating:{" "}
-              {game.average_rating !== null
+              {typeof game.average_rating === "number"
                 ? game.average_rating.toFixed(2)
                 : "No ratings yet"}
             </p>

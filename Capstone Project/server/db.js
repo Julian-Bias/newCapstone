@@ -43,7 +43,8 @@ const createTables = async () => {
         game_id UUID REFERENCES games(id),
         user_id UUID REFERENCES users(id),
         rating INT CHECK (rating BETWEEN 1 AND 5),
-        review_text TEXT NOT NULL
+        review_text TEXT NOT NULL,
+        UNIQUE (game_id, user_id)
     );
 
     CREATE TABLE comments (

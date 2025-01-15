@@ -1,8 +1,15 @@
-import React, { useContext } from "react";
-import { Link } from "react-router-dom";
+import React from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 const Header = () => {
   const token = localStorage.getItem("token");
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("userId");
+    navigate("/login"); // Redirect to login after logout
+  };
 
   return (
     <header>
@@ -10,8 +17,9 @@ const Header = () => {
         <Link to="/">Home</Link>
         {!token && <Link to="/login">Login</Link>}
         {!token && <Link to="/register">Register</Link>}
+        {token && <Link to="/games">View Games</Link>}
         {token && <Link to="/profile">Profile</Link>}
-        {token && <button onClick={() => localStorage.removeItem("token")}>Logout</button>}
+        {token && <button onClick={handleLogout}>Logout</button>}
       </nav>
     </header>
   );
