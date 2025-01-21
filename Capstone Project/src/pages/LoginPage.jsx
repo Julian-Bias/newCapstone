@@ -17,29 +17,37 @@ const LoginPage = ({ onLogin }) => {
         },
         body: JSON.stringify({ email, password }),
       });
-  
+
       if (!response.ok) {
-        throw new Error("Invalid email or password");
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Invalid email or password");
       }
-  
+
       const { token, user } = await response.json();
-  
-      // Save token and userId in localStorage
+
+      // Save token, userId, and role in localStorage
       localStorage.setItem("token", token);
-      localStorage.setItem("userId", user.id); // Store userId
-      console.log("User ID stored in Local Storage:", user.id);
-  
+      localStorage.setItem("userId", user.id);
+      localStorage.setItem("role", user.role); // Store role
+
+      console.log("User Role stored in Local Storage:", user.role);
+
       // Call the onLogin function to update parent state
-      onLogin(user);
-  
-      // Redirect to profile page
-      navigate("/profile");
+      if (onLogin) {
+        onLogin(user);
+      }
+
+      // Redirect to profile page or admin dashboard
+      if (user.role === "admin") {
+        navigate("/admin");
+      } else {
+        navigate("/profile");
+      }
     } catch (err) {
       setError(err.message);
       console.error("Login Error:", err.message);
     }
   };
-  
 
   return (
     <div>
@@ -52,6 +60,7 @@ const LoginPage = ({ onLogin }) => {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            required
           />
         </label>
         <br />
@@ -61,6 +70,7 @@ const LoginPage = ({ onLogin }) => {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            required
           />
         </label>
         <br />

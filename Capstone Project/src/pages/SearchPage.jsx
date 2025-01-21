@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import Spinner from "../components/Spinner";
 
 const SearchPage = () => {
   const [games, setGames] = useState([]); // Full list of games
@@ -27,17 +28,19 @@ const SearchPage = () => {
     fetchGames();
   }, []);
 
-  // Update the filtered games list whenever the search query changes
+  // Update the filtered games list whenever the search query changes and description query
   useEffect(() => {
     setFilteredGames(
-      games.filter((game) =>
-        game.title.toLowerCase().includes(searchQuery.toLowerCase())
+      games.filter(
+        (game) =>
+          game.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          game.description.toLowerCase().includes(searchQuery.toLowerCase())
       )
     );
   }, [searchQuery, games]);
 
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error}</div>;
+  if (loading) return <Spinner />;
+  if (error) return <div style={{ color: "red" }}>Error: {error}</div>;
 
   return (
     <div>
@@ -82,4 +85,3 @@ const SearchPage = () => {
 };
 
 export default SearchPage;
-

@@ -6,6 +6,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const uuid = require("uuid");
+const multer = require("multer");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -29,7 +30,22 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+// Configure multer for file storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/"); // Specify the folder for uploaded files
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `${uniqueSuffix}-${file.originalname}`);
+  },
+});
+
+const upload = multer({ storage });
+
 // --- Serve React App in Production ---
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
 if (process.env.NODE_ENV === "production") {
   // Serve static files from the React app's build folder
   app.use(express.static(path.join(__dirname, "../dist")));
@@ -44,15 +60,18 @@ if (process.env.NODE_ENV === "production") {
 
 //  Get all games
 app.get("/api/games", async (req, res) => {
-  const { search } = req.query; // Get the optional 'search' query parameter
+  const { search } = req.query;
 
   try {
-    let query = "SELECT * FROM games";
+    let query = `
+      SELECT g.*, c.name AS category_name
+      FROM games g
+      LEFT JOIN categories c ON g.category_id = c.id
+    `;
     const values = [];
 
-    // If there's a search term, add a WHERE clause for filtering by name
     if (search) {
-      query += " WHERE LOWER(title) LIKE $1";
+      query += " WHERE LOWER(g.title) LIKE $1";
       values.push(`%${search.toLowerCase()}%`);
     }
 
@@ -95,39 +114,6 @@ app.get("/api/games/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch game details" });
   }
 });
-
-// Get games with search and filter
-// app.get("/api/games", async (req, res) => {
-//   const { search, category } = req.query;
-//   try {
-//     let SQL = `
-//       SELECT g.*, c.name AS category_name,
-//              (SELECT AVG(rating) FROM reviews WHERE game_id = g.id) AS average_rating
-//       FROM games g
-//       LEFT JOIN categories c ON g.category_id = c.id
-//     `;
-//     const params = [];
-
-//     if (search || category) {
-//       SQL += " WHERE";
-//       if (search) {
-//         SQL += " LOWER(g.title) LIKE $1";
-//         params.push(`%${search.toLowerCase()}%`);
-//       }
-//       if (category) {
-//         if (params.length > 0) SQL += " AND";
-//         SQL += " c.id = $2";
-//         params.push(category);
-//       }
-//     }
-
-//     const games = await db.client.query(SQL, params);
-//     res.json(games.rows);
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).send("Error fetching games");
-//   }
-// });
 
 //  Register a new user
 app.post("/api/register", async (req, res) => {
@@ -201,7 +187,7 @@ app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const user = await db.client.query(`SELECT * FROM users WHERE email = $1`, [
+    const user = await db.client.query("SELECT * FROM users WHERE email = $1", [
       email,
     ]);
 
@@ -209,9 +195,10 @@ app.post("/api/login", async (req, res) => {
       user.rows.length === 0 ||
       !(await bcrypt.compare(password, user.rows[0].password_hash))
     ) {
-      return res.status(401).send("Invalid credentials");
+      return res.status(401).json({ message: "Invalid credentials" });
     }
 
+    // Include role in the JWT
     const token = jwt.sign(
       { id: user.rows[0].id, role: user.rows[0].role },
       process.env.SECRET_KEY,
@@ -224,14 +211,16 @@ app.post("/api/login", async (req, res) => {
         id: user.rows[0].id,
         username: user.rows[0].username,
         email: user.rows[0].email,
+        role: user.rows[0].role, // Include role here
       },
     });
   } catch (err) {
     console.error("Login Error:", err.message);
-    res.status(500).send("Error logging in");
+    res.status(500).json({ message: "Error logging in" });
   }
 });
 
+// --- Admin Routes ---
 // **Create a category **Admin
 app.post("/api/categories", authenticateToken, async (req, res) => {
   if (req.user.role !== "admin") return res.status(403).send("Access denied");
@@ -296,6 +285,75 @@ app.delete("/api/categories/:id", authenticateToken, async (req, res) => {
   }
 });
 
+// Fetch all dashboard data (Admin Only)
+app.get("/api/admin/dashboard", authenticateToken, async (req, res) => {
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ message: "Access denied" });
+  }
+
+  try {
+    const users = await db.client.query(
+      "SELECT id, username, email, role FROM users"
+    );
+    const games = await db.fetchGames();
+    const categories = await db.fetchCategories();
+    const reviews = await db.fetchReviews();
+
+    res.json({
+      users: users.rows,
+      games,
+      categories,
+      reviews,
+    });
+  } catch (err) {
+    console.error("Error fetching dashboard data:", err.message);
+    res.status(500).json({ message: "Error fetching dashboard data" });
+  }
+});
+
+// Promote a user to admin (Admin Only)
+app.put("/api/users/:id/role", authenticateToken, async (req, res) => {
+  if (req.user.role !== "admin") return res.status(403).send("Access denied");
+
+  const { id } = req.params;
+  const { role } = req.body;
+
+  try {
+    const result = await db.client.query(
+      `UPDATE users SET role = $1 WHERE id = $2 RETURNING *`,
+      [role, id]
+    );
+
+    if (result.rows.length === 0) return res.status(404).send("User not found");
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Error updating user role:", err.message);
+    res.status(500).send("Error updating user role");
+  }
+});
+
+// Delete a User
+app.delete("/api/users/:id", authenticateToken, async (req, res) => {
+  if (req.user.role !== "admin") return res.status(403).send("Access denied");
+
+  const { id } = req.params;
+
+  try {
+    const result = await db.client.query(
+      `DELETE FROM users WHERE id = $1 RETURNING *`,
+      [id]
+    );
+
+    if (result.rows.length === 0) return res.status(404).send("User not found");
+
+    res.status(204).send();
+  } catch (err) {
+    console.error("Error deleting user:", err.message);
+    res.status(500).send("Error deleting user");
+  }
+});
+
 // Fetch all users **Admin Only
 app.get("/api/users", authenticateToken, async (req, res) => {
   try {
@@ -317,6 +375,83 @@ app.get("/api/users", authenticateToken, async (req, res) => {
   } catch (err) {
     console.error("Error fetching users:", err);
     res.status(500).json({ message: "Error fetching users" });
+  }
+});
+
+// Fetch all categories
+app.get("/api/categories", authenticateToken, async (req, res) => {
+  try {
+    const categories = await db.fetchCategories();
+    res.json(categories);
+  } catch (err) {
+    console.error("Error fetching categories:", err.message);
+    res.status(500).send("Error fetching categories");
+  }
+});
+
+// Add a new game
+app.post("/api/games", authenticateToken, async (req, res) => {
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ message: "Access denied" });
+  }
+
+  const { title, description, category_id, image_url } = req.body;
+
+  try {
+    const SQL = `
+      INSERT INTO games (id, title, description, category_id, image_url, owner_id)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *;
+    `;
+    const values = [
+      uuid.v4(),
+      title,
+      description,
+      category_id,
+      image_url,
+      req.user.id,
+    ];
+    const result = await db.client.query(SQL, values);
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error("Error adding game:", err.message);
+    res.status(500).json({ message: "Error adding game" });
+  }
+});
+
+// Update a game
+app.put("/api/games/:id", authenticateToken, async (req, res) => {
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ message: "Access denied" });
+  }
+
+  const { id } = req.params;
+  const { title, description, category_id, image_url } = req.body;
+
+  if (!title || !description || !category_id || !image_url) {
+    return res.status(400).json({ message: "All fields are required" });
+  }
+
+  try {
+    const SQL = `
+      UPDATE games
+      SET title = $1, description = $2, category_id = $3, image_url = $4
+      WHERE id = $5
+      RETURNING *;
+    `;
+    const values = [title, description, category_id, image_url, id];
+
+    const result = await db.client.query(SQL, values);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Game not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Error updating game:", err.message);
+    res.status(500).json({ message: "Error updating game" });
   }
 });
 
@@ -349,21 +484,30 @@ app.get("/api/users/:id/comments", authenticateToken, async (req, res) => {
 });
 
 //  Create a review
-app.post("/api/reviews", authenticateToken, async (req, res) => {
-  const { game_id, rating, review_text } = req.body;
-  try {
-    const review = await db.createReview({
-      game_id,
-      user_id: req.user.id,
-      rating,
-      review_text,
-    });
-    res.status(201).json(review);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error creating review");
+app.post(
+  "/api/reviews",
+  authenticateToken,
+  upload.single("image"),
+  async (req, res) => {
+    const { game_id, rating, review_text } = req.body;
+    const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+
+    try {
+      const review = await db.createReview({
+        game_id,
+        user_id: req.user.id,
+        rating,
+        review_text,
+        image_url: imageUrl,
+      });
+
+      res.status(201).json(review);
+    } catch (err) {
+      console.error("Error creating review:", err.message);
+      res.status(500).send("Error creating review");
+    }
   }
-});
+);
 
 //  Edit a review
 app.put("/api/reviews/:id", authenticateToken, async (req, res) => {
@@ -417,35 +561,6 @@ app.get("/api/users/:id/reviews", authenticateToken, async (req, res) => {
   }
 });
 
-// Edit a review
-// app.put("/api/reviews/:id", authenticateToken, async (req, res) => {
-//   const { id } = req.params;
-//   const { review_text, rating } = req.body;
-
-//   try {
-//     const result = await db.client.query(
-//       `
-//       UPDATE reviews
-//       SET review_text = $1, rating = $2
-//       WHERE id = $3 AND user_id = $4
-//       RETURNING *;
-//       `,
-//       [review_text, rating, id, req.user.id]
-//     );
-
-//     if (result.rows.length === 0) {
-//       return res
-//         .status(404)
-//         .json({ message: "Review not found or unauthorized" });
-//     }
-
-//     res.json(result.rows[0]); // Return the updated review
-//   } catch (err) {
-//     console.error("Error editing review:", err);
-//     res.status(500).json({ message: "Error editing review" });
-//   }
-// });
-
 //  Delete a review
 app.delete("/api/reviews/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
@@ -474,31 +589,40 @@ app.delete("/api/reviews/:id", authenticateToken, async (req, res) => {
 });
 
 //  Add a comment to a review
-app.post("/api/comments", authenticateToken, async (req, res) => {
-  console.log("POST /api/comments triggered");
-  const { review_id, comment_text } = req.body;
+app.post(
+  "/api/comments",
+  authenticateToken,
+  upload.single("image"),
+  async (req, res) => {
+    console.log("POST /api/comments triggered");
 
-  try {
-    const result = await db.client.query(
-      `
-      INSERT INTO comments (id, review_id, user_id, comment_text)
-      VALUES ($1, $2, $3, $4)
+    const { review_id, comment_text } = req.body;
+    const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+
+    try {
+      const result = await db.client.query(
+        `
+      INSERT INTO comments (id, review_id, user_id, comment_text, image_url)
+      VALUES ($1, $2, $3, $4, $5)
       RETURNING *
       `,
-      [uuid.v4(), review_id, req.user.id, comment_text]
-    );
-    console.log("Incoming data:", {
-      review_id,
-      comment_text,
-      user_id: req.user.id,
-    });
+        [uuid.v4(), review_id, req.user.id, comment_text, imageUrl]
+      );
 
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    console.error("Error adding comment:", err.message);
-    res.status(500).send("Failed to add comment");
+      console.log("Incoming data:", {
+        review_id,
+        comment_text,
+        imageUrl,
+        user_id: req.user.id,
+      });
+
+      res.status(201).json(result.rows[0]);
+    } catch (err) {
+      console.error("Error adding comment:", err.message);
+      res.status(500).send("Failed to add comment");
+    }
   }
-});
+);
 
 // Get All comments on a review
 app.get("/api/reviews/:id/comments", async (req, res) => {

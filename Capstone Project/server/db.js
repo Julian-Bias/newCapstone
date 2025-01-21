@@ -44,6 +44,7 @@ const createTables = async () => {
         user_id UUID REFERENCES users(id),
         rating INT CHECK (rating BETWEEN 1 AND 5),
         review_text TEXT NOT NULL,
+        ALTER TABLE reviews ADD COLUMN image_url TEXT,
         UNIQUE (game_id, user_id)
     );
 
@@ -51,7 +52,8 @@ const createTables = async () => {
         id UUID PRIMARY KEY,
         review_id UUID REFERENCES reviews(id),
         user_id UUID REFERENCES users(id),
-        comment_text TEXT NOT NULL
+        comment_text TEXT NOT NULL,
+        ALTER TABLE comments ADD COLUMN image_url TEXT,
     );
   `;
   await client.query(SQL);
@@ -166,6 +168,14 @@ const fetchComments = async () => {
   return response.rows;
 };
 
+const fetchCategories = async () => {
+  const SQL = `
+    SELECT * FROM categories
+  `;
+  const response = await client.query(SQL);
+  return response.rows;
+};
+
 // Delete functions
 const deleteReview = async (id) => {
   const SQL = `
@@ -177,6 +187,13 @@ const deleteReview = async (id) => {
 const deleteComment = async (id) => {
   const SQL = `
     DELETE FROM comments WHERE id = $1
+  `;
+  await client.query(SQL, [id]);
+};
+
+const deleteCategory = async (id) => {
+  const SQL = `
+    DELETE FROM categories WHERE id = $1
   `;
   await client.query(SQL, [id]);
 };
@@ -193,7 +210,9 @@ module.exports = {
   fetchUsers,
   fetchGames,
   fetchReviews,
+  fetchCategories,
   fetchComments,
   deleteReview,
   deleteComment,
+  deleteCategory,
 };
