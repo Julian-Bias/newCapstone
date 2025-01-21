@@ -159,6 +159,7 @@ const AdminDashboard = () => {
         )
       );
       setEditGame(null);
+      setEditGameData({ title: "", description: "", categoryId: "", imageUrl: "" });
     } catch (err) {
       setError("Failed to edit game.");
       console.error(err);

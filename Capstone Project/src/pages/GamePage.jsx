@@ -166,6 +166,13 @@ const GamePage = () => {
             <p>
               <strong>{review.username}:</strong> {review.review_text}
             </p>
+            {review.image_url && (
+        <img
+          src={review.image_url}
+          alt={`${review.username}'s review image`}
+          className="review-image"
+        />
+      )}
             <p>Rating: {review.rating}</p>
             {comments[review.id]?.length > 0 ? (
               comments[review.id].map((comment) => (
