@@ -33,6 +33,7 @@ const ReviewForm = ({ gameId, onReviewSubmit }) => {
       if (!response.ok) throw new Error("Failed to submit review");
 
       const newReview = await response.json();
+      setError(null);
       onReviewSubmit(newReview);
       setRating(1);
       setReviewText("");

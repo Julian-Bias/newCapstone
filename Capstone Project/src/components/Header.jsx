@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 const Header = () => {
   const token = localStorage.getItem("token");
-  const userRole = localStorage.getItem("role"); // Assuming 'role' is stored in localStorage after login
+  const userRole = localStorage.getItem("role");
   const navigate = useNavigate();
 
   const handleLogout = () => {
