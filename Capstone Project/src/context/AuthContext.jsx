@@ -2,29 +2,21 @@ import React, { createContext, useState, useEffect } from "react";
 
 export const AuthContext = createContext();
 
-const AuthProvider = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
+  // Sync with localStorage on mount
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const role = localStorage.getItem("role");
-    const userId = localStorage.getItem("userId");
-
-    if (token) {
-      setIsAuthenticated(true);
-      setUser({ id: userId, role });
-    } else {
-      setIsAuthenticated(false);
-      setUser(null);
+    const storedRole = localStorage.getItem("role");
+    const storedUserId = localStorage.getItem("userId");
+    if (storedRole && storedUserId) {
+      setUser({ role: storedRole, id: storedUserId });
     }
   }, []);
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user }}>
+    <AuthContext.Provider value={{ user, setUser }}>
       {children}
     </AuthContext.Provider>
   );
 };
-
-export default AuthProvider;
