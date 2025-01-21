@@ -155,9 +155,9 @@ const GamePage = () => {
     <div>
       <h1>{game.title}</h1>
       <img src={game.image_url} alt={game.title} />
-      <p>{game.description}</p>
+      <p>Game Description:<br></br>{game.description}</p>
       <p>Category: {game.category_name}</p>
-      <p>Average Rating: {game.average_rating || "No ratings yet"}</p>
+      <p>Average Rating: {game.average_rating ? parseFloat(game.average_rating).toFixed(2) : "No ratings yet"}</p>
 
       <h2>Reviews</h2>
       {reviews.length > 0 ? (

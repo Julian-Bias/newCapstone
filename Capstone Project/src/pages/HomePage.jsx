@@ -28,7 +28,7 @@ const HomePage = () => {
 
   return (
     <div>
-      <h1>Game Reviews</h1>
+      <h1>View Our Reviews</h1>
       <ul>
         {games.map((game) => (
           <li key={game.id}>
@@ -36,7 +36,8 @@ const HomePage = () => {
               <Link to={`/games/${game.id}`}>{game.title}</Link>
             </h2>
             <p>{game.description}</p>
-            <p>Average Rating: {game.average_rating || "No ratings yet"}</p>
+            <p>Average Rating: {game.average_rating ? parseFloat(game.average_rating).toFixed(2) : "No ratings yet"}</p>
+            <img src={game.image_url} alt={game.title} />
           </li>
         ))}
       </ul>

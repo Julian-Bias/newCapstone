@@ -44,7 +44,7 @@ const SearchPage = () => {
 
   return (
     <div>
-      <h1>Game Reviews</h1>
+      <h1>Search All Games</h1>
 
       {/* Search Bar */}
       <input

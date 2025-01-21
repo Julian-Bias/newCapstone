@@ -10,6 +10,7 @@ import GamesList from "./pages/SearchPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
+import './styles/styles.css'
 
 const App = () => {
   return (

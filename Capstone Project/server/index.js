@@ -64,7 +64,8 @@ app.get("/api/games", async (req, res) => {
 
   try {
     let query = `
-      SELECT g.*, c.name AS category_name
+      SELECT g.id, g.title, g.description, g.image_url, c.name AS category_name,
+             COALESCE(ROUND((SELECT AVG(rating) FROM reviews WHERE game_id = g.id), 2), 0) AS average_rating
       FROM games g
       LEFT JOIN categories c ON g.category_id = c.id
     `;

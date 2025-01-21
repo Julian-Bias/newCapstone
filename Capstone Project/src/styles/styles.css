@@ -1,43 +1,196 @@
-.games-list {
-    margin: 20px;
-    padding: 20px;
-    background-color: #f9f9f9;
+/* Global styles */
+body {
+  font-family: "Arial", sans-serif;
+  background-color: #e4dada; /* Light grey background */
+  color: #333; /* Darker text color for better contrast */
+  margin: 0;
+  padding: 0;
+}
+
+/* Header styling */
+header {
+  background-color: #4b0082; /* Purple theme */
+  color: white;
+  padding: 1rem;
+  text-align: center;
+  font-size: 1.5rem;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+header nav {
+  display: flex;
+  justify-content: center; /* Center the links */
+  gap: 20px; /* Space between links */
+}
+
+/* Links */
+a {
+  color: #e499e4; /* Light purple for links */
+  text-decoration: none;
+}
+
+a:hover {
+  color: #ba55d3; /* Darker purple for hover */
+}
+
+/* Media Queries for Responsiveness */
+
+/* Tablets and smaller devices */
+@media (max-width: 768px) {
+  header nav {
+    flex-direction: column; /* Stack links vertically */
+    gap: 15px; /* Reduce spacing between links */
   }
-  
-  .games-list-container {
-    list-style-type: none;
-    padding: 0;
-  }
-  
-  .game-item {
-    margin: 10px 0;
-    padding: 15px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    background-color: #fff;
-  }
-  
+
   header {
-    background-color: #333;
-    color: #fff;
-    padding: 10px;
-    text-align: center;
+    text-align: left; /* Adjust alignment for smaller screens */
+    font-size: 1.2rem; /* Slightly smaller text size */
   }
-  
-  header nav a {
-    margin: 0 10px;
-    color: #fff;
-    text-decoration: none;
+
+  nav ul {
+    flex-direction: column; /* Stack links in nav bar vertically */
+    gap: 10px;
   }
-  
-  .review-card, .comment-card {
-    border: 1px solid #ccc;
-    padding: 10px;
-    margin: 10px 0;
-    border-radius: 5px;
+}
+
+/* Phones and smaller screens */
+@media (max-width: 480px) {
+  header {
+    font-size: 1rem; /* Further reduce text size */
+    padding: 0.8rem;
   }
-  
-  .review-card p, .comment-card p {
-    margin: 5px 0;
+
+  header nav {
+    gap: 10px;
   }
-  
+
+  nav ul {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  a {
+    font-size: 0.9rem; /* Smaller font for links */
+  }
+}
+
+/* Buttons */
+button {
+  background-color: #6a0dad; /* Purple theme */
+  color: white;
+  border: 2px, solid;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+button:hover {
+  background-color: #5b0a91;
+}
+
+/* Forms */
+form {
+  background-color: white;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+  max-width: 400px;
+  margin: 2rem auto;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+  padding: 0.8rem;
+  margin-bottom: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: #6a0dad;
+  outline: none;
+}
+
+/* Cards for reviews and comments */
+.review-card,
+.comment-card {
+  background-color: white;
+  margin: 1rem auto;
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.review-card h3,
+.comment-card h3 {
+  color: #6a0dad;
+}
+
+/* Profile page */
+.profile-page {
+  background-color: #f7f7f7;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+  max-width: 600px;
+  margin: 2rem auto;
+}
+
+.profile-page h1 {
+  color: #4b0082;
+}
+
+/* Admin Dashboard */
+.admin-dashboard {
+  background-color: white;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+  margin: 2rem;
+}
+
+.admin-dashboard h2 {
+  color: #4b0082;
+  margin-bottom: 1rem;
+}
+
+/* Navigation */
+nav {
+  background-color: #4b0082;
+  padding: 1rem;
+}
+
+nav ul {
+  list-style-type: none;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+nav li {
+  display: inline;
+}
+
+/* Footer */
+footer {
+  background-color: #4b0082;
+  color: white;
+  text-align: center;
+  padding: 1rem 0;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+}
