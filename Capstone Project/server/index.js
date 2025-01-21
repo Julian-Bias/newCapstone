@@ -5,6 +5,7 @@ const db = require("./db");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
+const uuid = require("uuid");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,6 +16,7 @@ app.use(express.json());
 
 // Middleware to authenticate JWT tokens
 const authenticateToken = (req, res, next) => {
+  console.log("authenticateToken middleware triggered");
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
 
@@ -42,11 +44,22 @@ if (process.env.NODE_ENV === "production") {
 
 //  Get all games
 app.get("/api/games", async (req, res) => {
+  const { search } = req.query; // Get the optional 'search' query parameter
+
   try {
-    const games = await db.fetchGames();
-    res.json(games);
+    let query = "SELECT * FROM games";
+    const values = [];
+
+    // If there's a search term, add a WHERE clause for filtering by name
+    if (search) {
+      query += " WHERE LOWER(title) LIKE $1";
+      values.push(`%${search.toLowerCase()}%`);
+    }
+
+    const result = await db.client.query(query, values);
+    res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    console.error("Error fetching games:", err.message);
     res.status(500).send("Error fetching games");
   }
 });
@@ -462,6 +475,7 @@ app.delete("/api/reviews/:id", authenticateToken, async (req, res) => {
 
 //  Add a comment to a review
 app.post("/api/comments", authenticateToken, async (req, res) => {
+  console.log("POST /api/comments triggered");
   const { review_id, comment_text } = req.body;
 
   try {
@@ -473,6 +487,11 @@ app.post("/api/comments", authenticateToken, async (req, res) => {
       `,
       [uuid.v4(), review_id, req.user.id, comment_text]
     );
+    console.log("Incoming data:", {
+      review_id,
+      comment_text,
+      user_id: req.user.id,
+    });
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -503,20 +522,77 @@ app.get("/api/reviews/:id/comments", async (req, res) => {
   }
 });
 
-//  Delete a comment
-app.delete("/api/comments/:id", authenticateToken, async (req, res) => {
-  const { id } = req.params;
+//Get comments for all reviews to display
+app.get("/api/comments", async (req, res) => {
   try {
     const result = await db.client.query(
-      `DELETE FROM comments WHERE id = $1 AND user_id = $2 RETURNING *`,
-      [id, req.user.id]
+      `
+      SELECT comments.*, users.username
+      FROM comments
+      JOIN users ON comments.user_id = users.id
+      `
     );
-    if (result.rows.length === 0)
-      return res.status(404).send("Comment not found");
-    res.status(204).send();
+
+    res.json(result.rows);
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error deleting comment");
+    console.error("Error fetching all comments:", err.message);
+    res.status(500).send("Failed to fetch comments");
+  }
+});
+
+//Edit User Comment
+app.put("/api/comments/:commentId", authenticateToken, async (req, res) => {
+  const { commentId } = req.params;
+  const { comment_text } = req.body;
+
+  try {
+    const result = await db.client.query(
+      `
+      UPDATE comments
+      SET comment_text = $1
+      WHERE id = $2 AND user_id = $3
+      RETURNING *
+      `,
+      [comment_text, commentId, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ error: "Comment not found or not authorized" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Error editing comment:", err.message);
+    res.status(500).send("Failed to edit comment");
+  }
+});
+
+//  Delete a comment
+app.delete("/api/comments/:commentId", authenticateToken, async (req, res) => {
+  const { commentId } = req.params;
+
+  try {
+    const result = await db.client.query(
+      `
+      DELETE FROM comments
+      WHERE id = $1 AND user_id = $2
+      RETURNING *
+      `,
+      [commentId, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ error: "Comment not found or not authorized" });
+    }
+
+    res.json({ message: "Comment deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting comment:", err.message);
+    res.status(500).send("Failed to delete comment");
   }
 });
 

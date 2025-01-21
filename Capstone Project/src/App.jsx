@@ -6,7 +6,7 @@ import GamePage from "./pages/GamePage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import UserProfile from "./pages/UserProfile";
-import GamesList from "./components/GamesList"
+import GamesList from "./pages/SearchPage"
 
 const App = () => {
   const [user, setUser] = useState(null);

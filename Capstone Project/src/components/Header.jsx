@@ -16,9 +16,9 @@ const Header = () => {
       <nav>
         <Link to="/">Home</Link>
         {!token && <Link to="/login">Login</Link>}
-        {!token && <Link to="/register">Register</Link>}
-        {token && <Link to="/games">View Games</Link>}
-        {token && <Link to="/profile">Profile</Link>}
+        {!token && <Link to="/register">Register</Link>}||
+        {token && <Link to="/games">Search Games</Link>}||
+        {token && <Link to="/profile">Profile</Link>}||
         {token && <button onClick={handleLogout}>Logout</button>}
       </nav>
     </header>
