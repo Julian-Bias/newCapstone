@@ -44,7 +44,7 @@ const createTables = async () => {
         user_id UUID REFERENCES users(id),
         rating INT CHECK (rating BETWEEN 1 AND 5),
         review_text TEXT NOT NULL,
-        ALTER TABLE reviews ADD COLUMN image_url TEXT,
+        image_url TEXT
         UNIQUE (game_id, user_id)
     );
 
@@ -53,7 +53,7 @@ const createTables = async () => {
         review_id UUID REFERENCES reviews(id),
         user_id UUID REFERENCES users(id),
         comment_text TEXT NOT NULL,
-        ALTER TABLE comments ADD COLUMN image_url TEXT,
+        image_url TEXT
     );
   `;
   await client.query(SQL);

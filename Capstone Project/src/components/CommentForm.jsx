@@ -28,6 +28,7 @@ const CommentForm = ({ reviewId, onCommentSubmit }) => {
       if (!response.ok) throw new Error("Failed to post comment");
 
       const newComment = await response.json();
+      setError(null);
       onCommentSubmit(newComment);
       setCommentText("");
       setImage(null); // Clear the file input
